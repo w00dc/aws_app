@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "aws_app"
+version = "0.1.0"
+description = ""
+authors = ["Chris Wood <woodc@us.ibm.com>"]
+readme = "README.md"
+packages = [{include = "aws_app"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pypdf = "^4.1.0"
+streamlit = "^1.32"
+langchain = "^0.1.14"
+langchain_community = "^0.0.30"
+langchain_openai = "^0.1.1"
+openai = "^1.16.0"
+faiss-cpu = "^1.8.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.3.0"
+pre-commit = "^3.3.2"
+pytest = "^7.3.1"
+pylint = "^2.17.4"
+pylint-pydantic = "^0.3.2"
+pydantic-settings = "^2.2.0"
+
+[tool.bandit]
+exclude_dirs = ["tests", "env", "__pycache__", ".pytest_cache"]
+skips = ["B104"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

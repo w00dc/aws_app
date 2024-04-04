@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     """Primary settings object for initializing application"""
 
     port: int = 8501
+    app_name: str = "dm_bot"
+    log_level: str = "DEBUG"
     openai_api_key: str = "missing"
     vectorstore_path: str = ""
 

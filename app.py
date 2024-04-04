@@ -1,44 +1,37 @@
 import streamlit as st
 import os
-from pypdf import PdfReader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+import logging
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain.chains import ConversationalRetrievalChain
-from langchain.chains.question_answering import load_qa_chain
-from langchain_openai import ChatOpenAI
 from langchain.memory import ChatMessageHistory
 
-from config import get_settings, LoggingFormatter
+from config import get_settings, create_logger
+from helpers import read_pdf_into_chunks, generate_response
 
 settings = get_settings()
 
-OPENAI_API_KEY = settings.openai_api_key
 
-
-def read_pdf_into_chunks(file):
-    # Instantiate the bulk of text to empty
-    # and iterate over each file, extracting the
-    # text. Separate each file with two newlines.
-    text = ""
-    for f in file:
-        pdf_reader = PdfReader(f)
-        for page in pdf_reader.pages:
-            text += page.extract_text()
-        text += "\n\n"
-
-    # Break it into chunks
-    text_splitter = RecursiveCharacterTextSplitter(
-        separators="\n", chunk_size=1000, chunk_overlap=150, length_function=len
+# Initialize logger
+if "logger" not in st.session_state:
+    st.session_state["logger"] = create_logger(
+        name=f"{settings.app_name}",
+        level=f"{settings.log_level}",
+        file=f"{settings.app_name}.log",
     )
-    chunks = text_splitter.split_text(text)
-    return chunks
+logger = st.session_state["logger"]
 
+# Initialize an empty chat history
+if "chat_history" not in st.session_state:
+    st.session_state["chat_history"] = ChatMessageHistory()
+ephemeral_chat_history = st.session_state["chat_history"]
 
 # Generate OpenAIEmbeddings()
-embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+embeddings = OpenAIEmbeddings(openai_api_key=settings.openai_api_key)
+
 
 # Load the vectorstore from a file if it is there
+# TODO: Need to link the logic here up to the file
+#       uploader.
 if os.path.exists(settings.vectorstore_path):
     # To load vector_store from a saved file...
     vector_store = FAISS.load_local(
@@ -74,11 +67,10 @@ with st.sidebar:
 # If files have been uploaded,
 # extract the text from them
 if file:
-    # Read the PDF file indo chunks
-    chunks = read_pdf_into_chunks(file)
-
     # Load the vectors if the are already present
     if not os.path.exists(settings.vectorstore_path):
+        # Read the PDF file into chunks
+        chunks = read_pdf_into_chunks(file)
         # Creating vector store - FAISS
         vector_store = FAISS.from_texts(chunks, embeddings)
         # Saving it to the path in the environment variable
@@ -87,9 +79,6 @@ if file:
     # Create a chat input field and store
     # the user's input in user_question
     user_question = st.chat_input("Type your question here")
-
-    # Instantiate an empty chat history
-    ephemeral_chat_history = ChatMessageHistory()
 
     # If the user has input a question...
     if user_question:
@@ -106,42 +95,11 @@ if file:
         # generates it's response
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                # Do similarity search
-                match = vector_store.similarity_search(user_question)
-
-                # define the LLM
-                llm = ChatOpenAI(
-                    openai_api_key=OPENAI_API_KEY,
-                    temperature=0,
-                    max_tokens=1000,
-                    model_name="gpt-3.5-turbo",
+                # Generate the response
+                response_text = generate_response(
+                    user_question, vector_store, ephemeral_chat_history
                 )
-
-                # stuff qa chain
-                # chain -> take the question, get relevant document, pass it to the LLM, generate the output
-                # chain = load_qa_chain(llm, chain_type="stuff")
-                # response = chain.invoke(
-                #     {
-                #         "input_documents": match,
-                #         "question": user_question,
-                #         "messages": ephemeral_chat_history.messages,
-                #     }
-                # )
-                # response_text = response["output_text"]
-
-                # ConversationalRetrievalChain
-                chain = ConversationalRetrievalChain.from_llm(
-                    llm=llm,
-                    retriever=vector_store.as_retriever(),
-                )
-                response = chain.invoke(
-                    {
-                        "question": user_question,
-                        "chat_history": ephemeral_chat_history.messages,
-                    }
-                )
-                response_text = response["answer"]
-
+                # Write out the response text
                 st.write(response_text)
 
         # Add the response to the chat history
@@ -150,3 +108,4 @@ if file:
         # Add response to the session state
         message = {"role": "assistant", "content": response_text}
         st.session_state.messages.append(message)
+        logger.debug(f"Chat history: {ephemeral_chat_history.messages}")

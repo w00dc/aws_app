@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     log_level: str = "DEBUG"
     openai_api_key: str = "missing"
     vectorstore_path: str = ""
+    files_path: str = ""
+    chunk_size: int = 0
+    chunk_overlap: int = 0
 
     class Config:
         """Defines how pydantic should read in settings"""

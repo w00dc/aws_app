@@ -159,4 +159,7 @@ cython_debug/
 *.DS_Store
 
 # Local vectorstore
-vectors/
+*vectors/
+
+# DnD PDF dir
+dnd/

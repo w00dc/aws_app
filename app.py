@@ -6,7 +6,7 @@ from langchain_community.vectorstores import FAISS
 from langchain.memory import ChatMessageHistory
 
 from config import get_settings, create_logger
-from helpers import read_pdf_into_chunks, generate_response
+from helpers import read_pdf_into_chunks, get_files_in_path, generate_response
 
 settings = get_settings()
 
@@ -55,25 +55,34 @@ for message in st.session_state.messages:
 # Configure the sidebar for uploading
 # PDF document(s)
 # TODO: Replace this with a folder of PDFs to ingest automatically???
-with st.sidebar:
-    st.title("Uploaded Documents")
-    file = st.file_uploader(
-        " Upload PDF file(s) of rules or campaigns and ask questions",
-        type="pdf",
-        accept_multiple_files=True,
-        help="Select multiple PDFs and the Dungeon Master Assistant will read them for fielding questions",
-    )
+#       Change this sidebar so that it can toggle between multiple
+#       Subdirs of PDF collections, each with their own vector stores
+# with st.sidebar:
+#     st.title("Uploaded Documents")
+#     files = st.file_uploader(
+#         " Upload PDF file(s) of rules or campaigns and ask questions",
+#         type="pdf",
+#         accept_multiple_files=True,
+#         help="Select multiple PDFs and the Dungeon Master Assistant will read them for fielding questions",
+#     )
 
-# If files have been uploaded,
-# extract the text from them
-if file:
+# Set a list a files from a pre-set directory
+if "files" not in st.session_state.keys():
+    st.session_state.files = get_files_in_path(settings.files_path)
+files = st.session_state.files
+
+# If files have be instantiated...
+if files:
     # Load the vectors if the are already present
     if not os.path.exists(settings.vectorstore_path):
         # Read the PDF file into chunks
-        chunks = read_pdf_into_chunks(file)
+        chunks = read_pdf_into_chunks(files)
         # Creating vector store - FAISS
         vector_store = FAISS.from_texts(chunks, embeddings)
         # Saving it to the path in the environment variable
+        # TODO: After we modify this to pull PDFs from
+        #       a directory/other place, change this to store
+        #       it's vector store somewhere, accordingly
         vector_store.save_local(settings.vectorstore_path)
 
     # Create a chat input field and store
